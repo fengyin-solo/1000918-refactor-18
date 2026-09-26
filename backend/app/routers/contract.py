@@ -27,7 +27,7 @@ def list_entries(
     if size > 200:
         raise HTTPException(status_code=400, detail="每页最多 200 条，请缩小分页范围")
     items, total = service.list_entries(keyword=keyword, status=status, page=page, size=size)
-    return PageResult(items=items, total=total, page=page, size=size)
+    return PageResult(items=[service.present(item) for item in items], total=total, page=page, size=size)
 
 
 @router.get("/{entry_id}", response_model=dict)
@@ -36,7 +36,7 @@ def get_entry(entry_id: int) -> dict:
     entry = service.get_entry(entry_id)
     if entry is None:
         raise HTTPException(status_code=404, detail=f"委托合同 {entry_id} 不存在或已归档")
-    return entry
+    return service.present(entry)
 
 
 @router.post("", response_model=ActionResult)
@@ -45,7 +45,7 @@ def create_entry(payload: EntryPayload) -> ActionResult:
     entry, missing = service.create_entry(payload.values)
     if missing:
         return ActionResult(ok=False, message=f"缺少必填字段：{'、'.join(missing)}")
-    return ActionResult(ok=True, message="委托合同已登记", entry=entry)
+    return ActionResult(ok=True, message="委托合同已登记", entry=service.present(entry))
 
 
 @router.post("/{entry_id}/actions", response_model=ActionResult)
@@ -55,7 +55,7 @@ def run_action(entry_id: int, payload: EntryPayload) -> ActionResult:
     entry, message = service.run_action(entry_id, action)
     if entry is None:
         return ActionResult(ok=False, message=message)
-    return ActionResult(ok=True, message=message, entry=entry)
+    return ActionResult(ok=True, message=message, entry=service.present(entry))
 
 
 @router.get("/export")
