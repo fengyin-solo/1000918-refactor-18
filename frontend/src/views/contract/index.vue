@@ -39,7 +39,7 @@
           <td v-for="column in columns" :key="column">{{ row[column] ?? '—' }}</td>
           <td class="row-actions">
             <button
-              v-for="action in actions"
+              v-for="action in rowActions(row)"
               :key="action"
               class="link"
               type="button"
@@ -47,6 +47,7 @@
             >
               {{ action }}
             </button>
+            <span v-if="!rowActions(row).length">—</span>
           </td>
         </tr>
         <tr v-if="!rows.length">
@@ -67,11 +68,10 @@ import { onMounted, ref } from 'vue'
 
 import { request } from '@/api/client'
 
-type Row = Record<string, string | number | null>
+type Row = Record<string, string | number | string[] | null>
 
 const ENDPOINT = '/api/contract'
 const columns = ["合同编号", "委托单位", "检测项目", "合同金额", "签订日期", "约定周期", "联系人", "合同状态"]
-const actions = ["签订合同", "开始执行", "终止合同"]
 const statuses = ["待签订", "执行中", "已完成", "已终止"]
 const stats = [{"label": "执行中合同", "value": 0}, {"label": "待签订合同", "value": 0}, {"label": "已完成合同", "value": 0}]
 
@@ -94,6 +94,11 @@ function openCreate() {
   errorMessage.value = '委托合同登记入口尚未接入审批流'
 }
 
+function rowActions(row: Row): string[] {
+  const value = row.actions
+  return Array.isArray(value) ? value : []
+}
+
 async function runAction(action: string, row: Row) {
   errorMessage.value = ''
   try {
@@ -101,8 +106,9 @@ async function runAction(action: string, row: Row) {
       method: 'POST',
       body: JSON.stringify({ action }),
     })
-    if (!response.ok) {
-      throw new Error('委托合同动作未生效，请稍后重试')
+    const payload = await response.json().catch(() => null)
+    if (!response.ok || payload?.ok === false) {
+      throw new Error(payload?.message ?? '委托合同动作未生效，请稍后重试')
     }
     await reload()
   } catch (error) {
